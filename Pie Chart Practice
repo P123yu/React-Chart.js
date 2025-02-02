@@ -1,0 +1,87 @@
+import axios from "axios";
+import { ArcElement, Chart as ChartJS, Legend, Tooltip } from "chart.js";
+import React, { useEffect, useState } from "react";
+import { Pie } from "react-chartjs-2";
+import Swal from "sweetalert2";
+import { useStoreYear } from "../component/ZustandLocalStorage";
+
+// Register Chart.js components
+ChartJS.register(ArcElement, Tooltip, Legend);
+
+function NoOfCflBasedOnProject() {
+  const [projectCounts, setProjectCounts] = useState({});
+  const { selectedYear } = useStoreYear();
+
+  // ✅ Generate a random color
+  const generateRandomColor = () => {
+    const letters = "0123456789ABCDEF";
+    let color = "#";
+    for (let i = 0; i < 6; i++) {
+      color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+  };
+
+  useEffect(() => {
+    if (!selectedYear) {
+      return;
+    }
+
+    axios
+      .get(`http://localhost:8080/cfl/getAllByYear/${selectedYear}`)
+      .then((res) => {
+        // Extract and count projects
+        const projectData = res.data
+          ?.filter((item) => item?.cflProject && item?.cflProject !== "NA") // Filter out invalid projects
+          ?.reduce((acc, item) => {
+            const project = item.cflProject?.toLowerCase(); // Correct access of project
+            acc[project] = (acc[project] || 0) + 1; // Count occurrences of each project
+            return acc;
+          }, {});
+
+        setProjectCounts(projectData || {});
+      })
+      .catch((err) => {
+        console.error(err);
+        Swal.fire({
+          text: "No data found",
+          width: "350px",
+          timer: 2000,
+          timerProgressBar: true,
+          icon: "error",
+        });
+      });
+  }, [selectedYear]);
+
+  const projects = Object.keys(projectCounts);
+  const counts = Object.values(projectCounts);
+
+  // 🎨 Dynamic colors for each project
+  const backgroundColors = projects.map(() => generateRandomColor());
+
+  const data = {
+    labels: projects,
+    datasets: [
+      {
+        data: counts,
+        backgroundColor: backgroundColors,
+        hoverOffset: 10, // Bulging effect on hover
+      },
+    ],
+  };
+
+  return (
+    <div style={{ width: "50%", margin: "0 auto" }}>
+      <h3 style={{ textAlign: "center" }}>CFL Distribution by Projects</h3>
+      {projects.length > 0 ? (
+        <Pie data={data} />
+      ) : (
+        <p style={{ textAlign: "center" }}>
+          No project data available for the selected year.
+        </p>
+      )}
+    </div>
+  );
+}
+
+export default NoOfCflBasedOnProject;
