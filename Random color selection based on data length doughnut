@@ -1,0 +1,107 @@
+import axios from "axios";
+import { ArcElement, Chart as ChartJS, Legend, Tooltip } from "chart.js";
+import React, { useEffect, useState } from "react";
+import { Doughnut } from "react-chartjs-2"; // Changed to Doughnut
+import Swal from "sweetalert2";
+import { useStoreYear } from "../component/ZustandLocalStorage";
+
+// Register Chart.js components
+ChartJS.register(ArcElement, Tooltip, Legend);
+
+function NoOfCflBasedOnLocation() {
+  const [locationCounts, setLocationCounts] = useState({});
+  const { selectedYear } = useStoreYear();
+
+  // Generate a random color
+  const generateRandomColor = () => {
+    const letters = "0123456789ABCDEF";
+    let color = "#";
+    for (let i = 0; i < 6; i++) {
+      color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+  };
+
+  useEffect(() => {
+    if (!selectedYear) return;
+
+    axios
+      .get(`http://localhost:8080/cfl/getAllByYear/${selectedYear}`)
+      .then((res) => {
+        const locations = res.data?.filter(
+          (item) => item?.cflLocation && item?.cflLocation !== "NA"
+        );
+        const counts = locations.reduce((acc, item) => {
+          const location = item.cflLocation?.toLowerCase();
+          acc[location] = (acc[location] || 0) + 1;
+          return acc;
+        }, {});
+        setLocationCounts(counts);
+      })
+      .catch(() => {
+        Swal.fire({
+          text: "No data found for the selected year.",
+          width: "350px",
+          timer: 2000,
+          icon: "error",
+        });
+      });
+  }, [selectedYear]);
+
+  const labels = Object.keys(locationCounts);
+  const dataValues = Object.values(locationCounts);
+
+  // Check if the data is correctly formatted
+  console.log("Labels:", labels);
+  console.log("Data values:", dataValues);
+
+  // If no valid data, return a loading message or handle accordingly
+  if (labels.length === 0 || dataValues.length === 0) {
+    return (
+      <div style={{ width: "50%", margin: "auto" }}>
+        <h2 className="text-center">CFL Distribution by Location</h2>
+        <p>No data available for the selected year.</p>
+      </div>
+    );
+  }
+
+  // Generate colors dynamically
+  const backgroundColors = labels.map(() => generateRandomColor());
+
+  const data = {
+    labels, // Project locations (labels)
+    datasets: [
+      {
+        label: "No of CFL by Location", // Changed label to Location
+        data: dataValues, // Actual data (counts)
+        backgroundColor: backgroundColors, // Random background colors
+        hoverOffset: 10, // Makes the segment bulge on hover
+      },
+    ],
+  };
+
+  const options = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: "top",
+      },
+      tooltip: {
+        callbacks: {
+          label: function (tooltipItem) {
+            return `${tooltipItem.label}: ${tooltipItem.raw}`;
+          },
+        },
+      },
+    },
+  };
+
+  return (
+    <div style={{ width: "50%", margin: "auto" }}>
+      <h2 className="text-center">CFL Distribution by Location</h2>
+      <Doughnut data={data} options={options} />
+    </div>
+  );
+}
+
+export default NoOfCflBasedOnLocation;
